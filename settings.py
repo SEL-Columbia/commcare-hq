@@ -192,6 +192,7 @@ HQ_APPS = (
     'corehq.apps.commtrack',
     'corehq.apps.consumption',
     'couchforms',
+    'sqlcouch',
     'couchexport',
     'couchlog',
     'ctable',
@@ -775,6 +776,7 @@ COUCHDB_APPS = [
     # otherwise breaks tests
     'couchdbkit_aggregate',
     'couchforms',
+    'sqlcouch',
     'couchexport',
     'ctable',
     'hqadmin',

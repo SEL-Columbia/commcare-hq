@@ -1,5 +1,5 @@
+from corehq.apps.reports.filters.base import BaseReportFilter
 from corehq.apps.reports.standard import CustomProjectReport
-from corehq.apps.reports.fields import ReportField
 from corehq.apps.reports.datatables import DataTablesColumn, DataTablesHeader
 from corehq.apps.reports.generic import GenericTabularReport
 from dimagi.utils.couch.database import get_db
@@ -17,8 +17,8 @@ class ProjectOfficerReport(GenericTabularReport, CustomProjectReport):
     """
     name = "Project Officer Portfolio"
     slug = "officer_portfolio"
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
               'dca.reports.OfficerSelectionField']
     exportable = True
 
@@ -103,21 +103,40 @@ class ProjectOfficerReport(GenericTabularReport, CustomProjectReport):
 
         return rows
 
-class OfficerSelectionField(ReportField):
+
+class OfficerSelectionField(BaseReportFilter):
     slug = "officer"
+    label = ""  # because a label is required and this is a refactored super old filter
+
     template = "dca/officer-select.html"
-    def update_context(self):
+    # note, take a look at reports/filters/base.html if you are thinking of using this as an example
+    # this template likely doesn't follow the new paradigm
+
+    @property
+    def filter_context(self):
         results = get_db().view('dca/dca_collection_forms').all()
         res = set([result['key'][0] for result in results])
-        self.context['officers'] = res
-        self.context['officer'] = self.request.GET.get('officer', None)
+        return {
+            'officers': res,
+            'officer': self.request.GET.get('officer', None)
+        }
 
-class CurrencySelectionField(ReportField):
+
+class CurrencySelectionField(BaseReportFilter):
     slug = "currency"
+    label = ""  # because a label is required and this is a refactored super old filter
+
     template = "dca/curselect.html"
-    def update_context(self):
-        self.context['curname'] =  self.request.GET.get('curname', "MK")
-        self.context['curval'] = self.request.GET.get('curval', 1.0)
+    # note, take a look at reports/filters/base.html if you are thinking of using this as an example
+    # this template likely doesn't follow the new paradigm
+
+    @property
+    def filter_context(self):
+        return {
+            'curname': self.request.GET.get('curname', "MK"),
+            'curval': self.request.GET.get('curval', 1.0)
+        }
+
 
 class LendingGroup(object):
     case = None
@@ -564,9 +583,9 @@ class PortfolioComparisonReport(GenericTabularReport, CustomProjectReport):
     """
     name = "Portfolio Comparison"
     slug = "portfolio_comparison"
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
-              'corehq.apps.reports.fields.GroupField',
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
+              'corehq.apps.reports.filters.select.GroupFilter',
               'dca.reports.CurrencySelectionField']
     exportable = True
 
@@ -650,9 +669,9 @@ class PerformanceReport(GenericTabularReport, CustomProjectReport):
     slug = "project_performance"
     exportable = True
     use_datatables = False
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
-              'corehq.apps.reports.fields.GroupField',
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
+              'corehq.apps.reports.filters.select.GroupFilter',
               'dca.reports.CurrencySelectionField']
 
 
@@ -773,9 +792,9 @@ class PerformanceRatiosReport(GenericTabularReport, CustomProjectReport):
 #    template_name = "dca/performance-ratios.html"
     exportable = True
     use_datatables = False
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
-              'corehq.apps.reports.fields.GroupField',
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
+              'corehq.apps.reports.filters.select.GroupFilter',
               'dca.reports.CurrencySelectionField']
 
     _rows = [
@@ -837,4 +856,3 @@ class PerformanceRatiosReport(GenericTabularReport, CustomProjectReport):
                 rows.append(['<hr />'])
 
         return rows
-        

@@ -1,6 +1,6 @@
 from couchdbkit.ext.django.schema import Document
+from corehq.apps.reports.filters.base import BaseReportFilter
 from corehq.apps.reports.standard import CustomProjectReport
-from corehq.apps.reports.fields import ReportField
 from datetime import date
 from pathfinder.views import retrieve_patient_group, get_patients_by_provider
 from django.http import Http404
@@ -24,9 +24,9 @@ class PathfinderWardSummaryReport(CustomProjectReport):
     slug = "ward"
     asynchronous = False
     report_template_path = "pathfinder-reports/ward_summary.html"
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
-              'corehq.apps.reports.fields.GroupField']
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
+              'corehq.apps.reports.filters.select.GroupFilter']
     flush_layout = True
 
     @property
@@ -65,8 +65,8 @@ class PathfinderProviderReport(CustomProjectReport):
     slug = "provider"
     asynchronous = False
     report_template_path = "pathfinder-reports/provider_summary.html"
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
               'pathfinder.models.ProviderSelect']
     flush_layout = True
 
@@ -104,9 +104,9 @@ class PathfinderHBCReport(CustomProjectReport):
     slug = "hbc"
     asynchronous = False
     report_template_path = "pathfinder-reports/hbc.html"
-    fields = ['corehq.apps.reports.fields.MonthField',
-              'corehq.apps.reports.fields.YearField',
-              'corehq.apps.reports.fields.GroupField']
+    fields = ['corehq.apps.reports.filters.select.MonthFilter',
+              'corehq.apps.reports.filters.select.YearFilter',
+              'corehq.apps.reports.filters.select.GroupFilter']
     flush_layout = True
 
     @property
@@ -137,13 +137,22 @@ class PathfinderHBCReport(CustomProjectReport):
             date=date(year=int(year),month=int(month), day=01)
         )
 
-class ProviderSelect(ReportField):
-    slug = "provider"
-    template = "pathfinder-reports/provider-select.html"
 
-    def update_context(self):
+class ProviderSelect(BaseReportFilter):
+    slug = "provider"
+    label = ""  # because a label is required and this is a refactored super old filter
+
+    template = "pathfinder-reports/provider-select.html"
+    # note, take a look at reports/filters/base.html if you are thinking of using this as an example
+    # this template likely doesn't follow the new paradigm
+
+    @property
+    def filter_context(self):
         results = CommCareUser.by_domain('pathfinder')
-        self.context['names'] = {}
+        names = {}
         for result in results:
-            self.context['names'].update({result.username_in_report: result.get_id})
-        self.context['provider'] = self.request.GET.get('user', None)
+            names.update({result.username_in_report: result.get_id})
+        return {
+            'names': names,
+            'provider': self.request.GET.get('user', None)
+        }

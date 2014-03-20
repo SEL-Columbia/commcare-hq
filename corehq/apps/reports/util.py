@@ -13,6 +13,7 @@ from corehq.apps.announcements.models import ReportAnnouncement
 from corehq.apps.groups.models import Group
 from corehq.apps.reports.display import xmlns_to_name
 from corehq.apps.reports.models import HQUserType, TempCommCareUser
+from corehq.apps.sofabed.models import FormData
 from corehq.apps.users.models import CommCareUser, CouchUser
 from corehq.apps.users.util import user_id_to_username
 from couchexport.util import SerializableFunction
@@ -167,25 +168,19 @@ def get_all_owner_ids_submitted(domain):
     return set([row['key'][2] for row in submitted])
 
 def get_username_from_forms(domain, user_id):
-    key = make_form_couch_key(domain, user_id=user_id)
-    user_info = get_db().view(
-        'reports_forms/all_forms',
-        startkey=key,
-        limit=1,
-        reduce=False
-    ).one()
-    username = HQUserType.human_readable[HQUserType.ADMIN]
     try:
-        possible_username = user_info['value']['username']
-        if not possible_username == 'none':
-            username = possible_username
-        return username
-    except KeyError:
-        possible_username = user_id_to_username(user_id)
-        if possible_username:
-            username = possible_username
-    return username
+        possible_username = FormData.objects \
+            .filter(doc_type='XFormInstance') \
+            .filter(domain=domain) \
+            .filter(user_id=user_id) \
+            .values_list('username', flat=True)[0]
+    except IndexError:
+        possible_username = None
 
+    if not possible_username:
+        possible_username = user_id_to_username(user_id)
+
+    return possible_username or HQUserType.human_readable[HQUserType.ADMIN]
 
 def _report_user_dict(user):
     """

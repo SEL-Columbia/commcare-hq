@@ -7,7 +7,7 @@ from casexml.apps.case.models import CommCareCase
 from corehq import toggles, privileges
 from corehq.apps.app_manager.suite_xml import SuiteGenerator
 from corehq.apps.cloudcare.models import CaseSpec, ApplicationAccess
-from corehq.apps.cloudcare.touchforms_api import DELEGATION_STUB_CASE_TYPE
+from corehq.apps.cloudcare.touchforms_api import DELEGATION_STUB_CASE_TYPE, SessionDataHelper
 from corehq.apps.domain.decorators import login_and_domain_required, login_or_digest_ex, domain_admin_required
 from corehq.apps.groups.models import Group
 from corehq.apps.users.models import CouchUser, CommCareUser
@@ -19,7 +19,7 @@ from django.shortcuts import render
 from corehq.apps.app_manager.models import Application, ApplicationBase
 import json
 from corehq.apps.cloudcare.api import look_up_app_json, get_cloudcare_apps, get_filtered_cases, get_filters_from_request,\
-    api_closed_to_status, CaseAPIResult, CASE_STATUS_OPEN, get_app_json
+    api_closed_to_status, CaseAPIResult, CASE_STATUS_OPEN, get_app_json, get_open_form_sessions
 from dimagi.utils.parsing import string_to_boolean
 from django.conf import settings
 from corehq.apps.cloudcare import touchforms_api
@@ -139,13 +139,20 @@ def form_context(request, domain, app_id, module_id, form_id):
     app = Application.get(app_id)
     form_url = "%s%s" % (get_url_base(), reverse('download_xform', args=[domain, app_id, module_id, form_id]))
     case_id = request.GET.get('case_id')
+
+    # make the name for the session we will use with the case and form
+    session_name = app.get_module(module_id).forms[int(form_id)].name.values()[0]
+    if case_id:
+        session_name = '{0} - {1}'.format(session_name, CommCareCase.get(case_id).name)
+
     delegation = request.GET.get('task-list') == 'true'
     offline = request.GET.get('offline') == 'true'
-    return json_response(
-        touchforms_api.get_full_context(domain, request.couch_user, 
-                                        app, form_url, case_id,
-                                        delegation=delegation, offline=offline))
-        
+    session_helper = SessionDataHelper(domain, request.couch_user, case_id, delegation=delegation, offline=offline)
+    return json_response(session_helper.get_full_context(
+        {'form_url': form_url,},
+        {'session_name': session_name}
+    ))
+
 
 cloudcare_api = login_or_digest_ex(allow_cc_users=True)
 
@@ -302,6 +309,16 @@ def get_fixtures(request, domain, user_id, fixture_id=None):
                 return HttpResponse(ElementTree.tostring(fixture.getchildren()[0]), content_type="text/xml")
         raise Http404
 
+@cloudcare_api
+def get_sessions(request, domain):
+    # is it ok to pull user from the request? other api calls seem to have an explicit 'user' param
+    return json_response(get_open_form_sessions(request.user))
+
+
+@cloudcare_api
+def get_session_context(request, domain, session_id):
+    helper = SessionDataHelper(domain, request.couch_user)
+    return json_response(helper.get_full_context({'session_id': session_id}))
 
 class HttpResponseConflict(HttpResponse):
     status_code = 409
